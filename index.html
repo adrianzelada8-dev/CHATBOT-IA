@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Chatbot Clínica Dental</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        #chat {
+            background: white;
+            width: 400px;
+            height: 500px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        #mensajes {
+            flex: 1;
+            padding: 10px;
+            overflow-y: auto;
+        }
+        .mensaje {
+            margin-bottom: 10px;
+        }
+        .bot {
+            color: blue;
+        }
+        .cliente {
+            text-align: right;
+            color: green;
+        }
+        #input {
+            display: flex;
+            border-top: 1px solid #ddd;
+        }
+        input {
+            flex: 1;
+            padding: 10px;
+            border: none;
+        }
+        button {
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="chat">
+    <div id="mensajes"></div>
+    <div id="input">
+        <input id="texto" placeholder="Escribe tu mensaje..." />
+        <button onclick="enviar()">Enviar</button>
+    </div>
+</div>
+
+<script>
+async function enviar() {
+    const input = document.getElementById("texto");
+    const texto = input.value;
+    if (!texto) return;
+
+    mostrarMensaje("cliente", texto);
+    input.value = "";
+
+    const response = await fetch("http://127.0.0.1:8000/chat", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ texto })
+    });
+
+    const data = await response.json();
+    mostrarMensaje("bot", data.mensaje);
+}
+
+function mostrarMensaje(tipo, texto) {
+    const div = document.createElement("div");
+    div.className = "mensaje " + tipo;
+    div.innerText = texto;
+    document.getElementById("mensajes").appendChild(div);
+}
+</script>
+
+</body>
+</html>
