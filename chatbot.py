@@ -1,56 +1,80 @@
 import os
 import re
+import requests
 from openai import OpenAI
 
+# Cliente OpenAI
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
-# Leer info del negocio
+# Info del negocio
 with open("info_negocio.txt", "r", encoding="utf-8") as f:
     info_negocio = f.read()
 
-# Palabras que indican contacto
+# URL de Google Sheets (Apps Script)
+GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbwfuqsNl2fghl05PLkCRmHyP8w37ab6WMwfFTXI_Ra_2SaRNXZlRPlw2w44U2tzaYk/exec"
+
+# Palabras clave para detectar intención de contacto
 PALABRAS_CONTACTO = [
-    "cita", "reservar", "contactar", "llamar", "información", "telefono", "email"
+    "cita", "reservar", "contactar", "llamar", "información", "telefono", "teléfono", "email"
 ]
 
-# Función para detectar si el usuario quiere contacto
-def quiere_contacto(mensaje):
+def quiere_contacto(mensaje: str) -> bool:
     mensaje = mensaje.lower()
     return any(p in mensaje for p in PALABRAS_CONTACTO)
 
-# Función para extraer nombre y teléfono
-def extraer_contacto(texto):
-    # Detecta un número de teléfono de 9 dígitos
-    telefono_match = re.search(r"\b\d{9}\b", texto)
-    telefono = telefono_match.group(0) if telefono_match else None
+def extraer_nombre(mensaje: str):
+    patrones = [
+        r"me llamo\s+([a-záéíóúñ]+)",
+        r"soy\s+([a-záéíóúñ]+)",
+        r"mi nombre es\s+([a-záéíóúñ]+)"
+    ]
+    mensaje = mensaje.lower()
+    for patron in patrones:
+        match = re.search(patron, mensaje)
+        if match:
+            return match.group(1).capitalize()
+    return None
 
-    # Detecta un nombre simple: primera palabra con mayúscula
-    nombre_match = re.search(r"\b[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+", texto)
-    nombre = nombre_match.group(0) if nombre_match else None
+def extraer_telefono(mensaje: str):
+    match = re.search(r"\b\d{9}\b", mensaje)
+    return match.group(0) if match else None
 
-    return nombre, telefono
+def guardar_lead(nombre: str, telefono: str):
+    payload = {
+        "nombre": nombre,
+        "telefono": telefono
+    }
+    try:
+        requests.post(GOOGLE_SHEETS_URL, json=payload, timeout=5)
+    except Exception as e:
+        print("Error enviando lead a Google Sheets:", e)
 
-# Función para guardar lead
-def guardar_lead(nombre, telefono):
-    with open("leads.txt", "a", encoding="utf-8") as f:
-        f.write(f"{nombre},{telefono}\n")
+def responder(mensaje: str):
+    mensaje = mensaje.strip()
 
-# Función principal de respuesta
-def responder(mensaje):
-    # Si el usuario quiere contacto pero aún no da nombre/teléfono
+    # Mensaje vacío o saludo inicial
+    if not mensaje:
+        return {
+            "tipo": "respuesta",
+            "mensaje": "Hola, ¿en qué puedo ayudarte?"
+        }
+
+    # Intentar extraer datos de contacto
+    nombre = extraer_nombre(mensaje)
+    telefono = extraer_telefono(mensaje)
+
+    if nombre and telefono:
+        guardar_lead(nombre, telefono)
+        return {
+            "tipo": "lead",
+            "mensaje": f"Gracias {nombre}, te contactaremos pronto."
+        }
+
+    # Si quiere contacto pero no ha dado datos aún
     if quiere_contacto(mensaje):
         return {
             "tipo": "lead",
-            "mensaje": "Perfecto, ¿me dices tu nombre y contacto?"
-        }
-
-    # Intentamos extraer contacto
-    nombre, telefono = extraer_contacto(mensaje)
-    if nombre or telefono:
-        guardar_lead(nombre or "Desconocido", telefono or "Desconocido")
-        return {
-            "tipo": "lead_guardado",
-            "mensaje": f"Gracias {nombre or 'Usuario'}, te contactaremos pronto."
+            "mensaje": "Perfecto, ¿me dices tu nombre y teléfono?"
         }
 
     # Respuesta normal con OpenAI
@@ -60,8 +84,9 @@ def responder(mensaje):
             {
                 "role": "system",
                 "content": (
-                    "Responde solo con la información del negocio. "
-                    "Si no está, di que no lo sabes.\n\n"
+                    "Responde como asistente de una clínica dental. "
+                    "Usa solo la información del negocio. "
+                    "Si algo no está en la información, di que no lo sabes.\n\n"
                     f"{info_negocio}"
                 )
             },
