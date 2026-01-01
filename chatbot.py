@@ -15,7 +15,7 @@ PALABRAS_CONTACTO = [
 ]
 
 # URL de tu Apps Script (reemplaza con la tuya)
-WEB_APP_URL = "TU_WEB_APP_URL_AQUI"  # ej: https://script.google.com/macros/s/XXXX/exec
+WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwn4ijef_IF4FdZxJG8r0I6itKufNU-YztCgbu5GBjV9LgQ3GNfjQuZqytWLULIVxQ/exec"  # ej: https://script.google.com/macros/s/XXXX/exec
 
 # Función para detectar si el usuario quiere contacto
 def quiere_contacto(mensaje):
