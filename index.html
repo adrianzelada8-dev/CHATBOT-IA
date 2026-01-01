@@ -94,6 +94,7 @@ button:hover {
 
 <script>
 const API_URL = "https://web-production-e2e34.up.railway.app/chat";
+const LEADS_URL = "https://script.google.com/macros/s/AKfycbz4kfAOqNmdu4EmFZB01wX59km7m0lekDMhEyEUQNTJqP9qBURu4j1CvMz6DBUSHNAf/exec"; // reemplaza con tu URL de Apps Script
 
 function agregarMensaje(texto, clase) {
   const div = document.createElement("div");
@@ -102,6 +103,19 @@ function agregarMensaje(texto, clase) {
   const messages = document.getElementById("messages");
   messages.appendChild(div);
   messages.scrollTop = messages.scrollHeight; // scroll automático
+}
+
+// Función para enviar lead a Google Sheets
+async function enviarLead(nombre, telefono) {
+  try {
+    await fetch(LEADS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nombre, telefono })
+    });
+  } catch (error) {
+    console.error("Error al enviar lead:", error);
+  }
 }
 
 async function enviar() {
@@ -121,6 +135,21 @@ async function enviar() {
 
     const data = await res.json();
     agregarMensaje(data.mensaje, "bot");
+
+    // Si el backend dice que es un lead guardado, enviar a Google Sheets
+    if (data.tipo === "lead_guardado") {
+      // Extraemos nombre y teléfono del mensaje (ya que tu backend devuelve "Gracias NOMBRE...")
+      const match = data.mensaje.match(/Gracias (\w+),/);
+      const nombre = match ? match[1] : "Desconocido";
+
+      // Como no siempre tenemos teléfono en el mensaje, podrías pedir al usuario que lo ingrese
+      const telefono = prompt("Por favor, confirma tu teléfono para completar el registro:");
+
+      if (telefono) {
+        enviarLead(nombre, telefono);
+      }
+    }
+
   } catch (error) {
     agregarMensaje("Error de conexión. Intenta nuevamente.", "bot");
   }
@@ -134,7 +163,6 @@ document.getElementById("texto").addEventListener("keypress", function(e) {
   }
 });
 </script>
-
 
 </body>
 </html>
