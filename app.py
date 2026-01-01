@@ -7,7 +7,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # luego se limita en producción
+    allow_origins=["*"],  # En producción, restringe a tu dominio
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -19,3 +19,7 @@ class Mensaje(BaseModel):
 @app.post("/chat")
 def chat(mensaje: Mensaje):
     return responder(mensaje.texto)
+
+@app.get("/")
+def root():
+    return {"mensaje": "Chatbot activo"}
