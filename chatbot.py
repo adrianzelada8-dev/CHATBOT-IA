@@ -11,7 +11,7 @@ with open("info_negocio.txt", "r", encoding="utf-8") as f:
     info_negocio = f.read()
 
 # URL de Google Sheets (Apps Script)
-GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbwfuqsNl2fghl05PLkCRmHyP8w37ab6WMwfFTXI_Ra_2SaRNXZlRPlw2w44U2tzaYk/exec"
+GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbynMSlA3xKk6AWzT_hMIVSFrwrrlGl8V30lar0KchXolRMvKBO6HyTQHC1fxnpTjkk/exec"
 
 # Palabras clave para detectar intención de contacto
 PALABRAS_CONTACTO = [
