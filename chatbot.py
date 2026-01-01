@@ -44,8 +44,10 @@ def guardar_lead(nombre: str, telefono: str):
         "nombre": nombre,
         "telefono": telefono
     }
+    headers = {"Content-Type": "application/json"}  # IMPORTANTE
     try:
-        requests.post(GOOGLE_SHEETS_URL, json=payload, timeout=5)
+        r = requests.post(GOOGLE_SHEETS_URL, json=payload, headers=headers, timeout=5)
+        print("Lead enviado, status:", r.status_code, r.text)
     except Exception as e:
         print("Error enviando lead a Google Sheets:", e)
 
