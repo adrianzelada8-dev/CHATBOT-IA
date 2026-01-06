@@ -4,51 +4,110 @@
     <meta charset="UTF-8">
     <title>Chatbot Clínica Dental</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #f4f4f4;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-        #chat {
-            background: white;
-            width: 400px;
-            height: 500px;
-            border-radius: 8px;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        }
-        #mensajes {
-            flex: 1;
-            padding: 10px;
-            overflow-y: auto;
-        }
-        .mensaje {
-            margin-bottom: 10px;
-        }
-        .bot {
-            color: blue;
-        }
-        .cliente {
-            text-align: right;
-            color: green;
-        }
-        #input {
-            display: flex;
-            border-top: 1px solid #ddd;
-        }
-        input {
-            flex: 1;
-            padding: 10px;
-            border: none;
-        }
-        button {
-            padding: 10px;
-        }
-    </style>
+body {
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: #f2f6fb;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  margin: 0;
+}
+
+#chat {
+  background: #ffffff;
+  width: 420px;
+  max-width: 95%;
+  height: 560px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.12);
+  overflow: hidden;
+}
+
+/* Header */
+#chat::before {
+  content: "Asistente Clínica Dental";
+  background: #0b5ed7;
+  color: white;
+  padding: 14px;
+  font-weight: 600;
+  text-align: center;
+  font-size: 16px;
+}
+
+/* Mensajes */
+#messages {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.msg {
+  padding: 12px 16px;
+  border-radius: 18px;
+  max-width: 80%;
+  line-height: 1.4;
+  font-size: 15px;
+}
+
+/* Usuario */
+.user {
+  background: #0b5ed7;
+  color: white;
+  align-self: flex-end;
+  border-bottom-right-radius: 6px;
+}
+
+/* Bot */
+.bot {
+  background: #e9edf3;
+  color: #1f2937;
+  align-self: flex-start;
+  border-bottom-left-radius: 6px;
+}
+
+/* Input */
+#input {
+  display: flex;
+  border-top: 1px solid #e5e7eb;
+  padding: 10px;
+  background: #f9fafb;
+}
+
+input {
+  flex: 1;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #d1d5db;
+  font-size: 15px;
+  outline: none;
+}
+
+input:focus {
+  border-color: #0b5ed7;
+}
+
+button {
+  margin-left: 8px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 12px;
+  background: #0b5ed7;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #084298;
+}
+</style>
+
 </head>
 <body>
 
@@ -61,33 +120,63 @@
 </div>
 
 <script>
+const API_URL = "https://web-production-e2e34.up.railway.app/chat";
+
+const messages = document.getElementById("messages");
+const input = document.getElementById("texto");
+
+function agregarMensaje(texto, clase) {
+  const div = document.createElement("div");
+  div.className = "msg " + clase;
+  div.textContent = texto;
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function mostrarEscribiendo() {
+  const div = document.createElement("div");
+  div.className = "msg bot";
+  div.id = "typing";
+  div.textContent = "Escribiendo...";
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function quitarEscribiendo() {
+  const typing = document.getElementById("typing");
+  if (typing) typing.remove();
+}
+
 async function enviar() {
-    const input = document.getElementById("texto");
-    const texto = input.value;
-    if (!texto) return;
+  const texto = input.value.trim();
+  if (!texto) return;
 
-    mostrarMensaje("cliente", texto);
-    input.value = "";
+  agregarMensaje(texto, "user");
+  input.value = "";
 
-    const response = await fetch("http://127.0.0.1:8000/chat", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ texto })
+  mostrarEscribiendo();
+
+  try {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ texto })
     });
 
-    const data = await response.json();
-    mostrarMensaje("bot", data.mensaje);
+    const data = await res.json();
+    quitarEscribiendo();
+    agregarMensaje(data.mensaje, "bot");
+  } catch {
+    quitarEscribiendo();
+    agregarMensaje("Ha ocurrido un error. Inténtelo más tarde.", "bot");
+  }
 }
 
-function mostrarMensaje(tipo, texto) {
-    const div = document.createElement("div");
-    div.className = "mensaje " + tipo;
-    div.innerText = texto;
-    document.getElementById("mensajes").appendChild(div);
-}
+input.addEventListener("keydown", e => {
+  if (e.key === "Enter") enviar();
+});
 </script>
+
 
 </body>
 </html>
