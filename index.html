@@ -5,8 +5,8 @@
   <title>Chatbot</title>
   <style>
 body {
-  font-family: 'Arial', sans-serif;
-  background: #f5f7fa;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: #f2f6fb;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -15,71 +15,99 @@ body {
 }
 
 #chat {
-  background: white;
-  width: 400px;
-  max-width: 90%;
-  height: 500px;
-  border-radius: 15px;
+  background: #ffffff;
+  width: 420px;
+  max-width: 95%;
+  height: 560px;
+  border-radius: 16px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+  box-shadow: 0 12px 30px rgba(0,0,0,0.12);
   overflow: hidden;
 }
 
+/* Header */
+#chat::before {
+  content: "Asistente Clínica Dental";
+  background: #0b5ed7;
+  color: white;
+  padding: 14px;
+  font-weight: 600;
+  text-align: center;
+  font-size: 16px;
+}
+
+/* Mensajes */
 #messages {
   flex: 1;
-  padding: 15px;
+  padding: 16px;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .msg {
-  margin-bottom: 10px;
-  padding: 10px 15px;
-  border-radius: 20px;
-  max-width: 75%;
-  word-wrap: break-word;
+  padding: 12px 16px;
+  border-radius: 18px;
+  max-width: 80%;
+  line-height: 1.4;
+  font-size: 15px;
 }
 
+/* Usuario */
 .user {
-  background-color: #007bff;
-  color: #fff;
+  background: #0b5ed7;
+  color: white;
   align-self: flex-end;
+  border-bottom-right-radius: 6px;
 }
 
+/* Bot */
 .bot {
-  background-color: #e5e5ea;
-  color: #000;
+  background: #e9edf3;
+  color: #1f2937;
   align-self: flex-start;
+  border-bottom-left-radius: 6px;
 }
 
+/* Input */
 #input {
   display: flex;
-  border-top: 1px solid #ddd;
-  background: #f9f9f9;
+  border-top: 1px solid #e5e7eb;
+  padding: 10px;
+  background: #f9fafb;
 }
 
 input {
   flex: 1;
-  padding: 10px;
-  border: none;
-  font-size: 16px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #d1d5db;
+  font-size: 15px;
   outline: none;
 }
 
+input:focus {
+  border-color: #0b5ed7;
+}
+
 button {
-  padding: 0 20px;
+  margin-left: 8px;
+  padding: 0 18px;
   border: none;
-  background: #007bff;
-  color: #fff;
+  border-radius: 12px;
+  background: #0b5ed7;
+  color: white;
+  font-weight: 600;
   cursor: pointer;
-  font-weight: bold;
-  transition: background 0.3s;
 }
 
 button:hover {
-  background: #0056b3;
+  background: #084298;
 }
 </style>
+
 
 </head>
 <body>
@@ -94,37 +122,40 @@ button:hover {
 
 <script>
 const API_URL = "https://web-production-e2e34.up.railway.app/chat";
-const LEADS_URL = "https://script.google.com/macros/s/AKfycbz4kfAOqNmdu4EmFZB01wX59km7m0lekDMhEyEUQNTJqP9qBURu4j1CvMz6DBUSHNAf/exec"; // reemplaza con tu URL de Apps Script
+
+const messages = document.getElementById("messages");
+const input = document.getElementById("texto");
 
 function agregarMensaje(texto, clase) {
   const div = document.createElement("div");
   div.className = "msg " + clase;
   div.textContent = texto;
-  const messages = document.getElementById("messages");
   messages.appendChild(div);
-  messages.scrollTop = messages.scrollHeight; // scroll automático
+  messages.scrollTop = messages.scrollHeight;
 }
 
-// Función para enviar lead a Google Sheets
-async function enviarLead(nombre, telefono) {
-  try {
-    await fetch(LEADS_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nombre, telefono })
-    });
-  } catch (error) {
-    console.error("Error al enviar lead:", error);
-  }
+function mostrarEscribiendo() {
+  const div = document.createElement("div");
+  div.className = "msg bot";
+  div.id = "typing";
+  div.textContent = "Escribiendo...";
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function quitarEscribiendo() {
+  const typing = document.getElementById("typing");
+  if (typing) typing.remove();
 }
 
 async function enviar() {
-  const input = document.getElementById("texto");
   const texto = input.value.trim();
   if (!texto) return;
 
   agregarMensaje(texto, "user");
   input.value = "";
+
+  mostrarEscribiendo();
 
   try {
     const res = await fetch(API_URL, {
@@ -134,22 +165,19 @@ async function enviar() {
     });
 
     const data = await res.json();
+    quitarEscribiendo();
     agregarMensaje(data.mensaje, "bot");
-
-
-  } catch (error) {
-    agregarMensaje("Error de conexión. Intenta nuevamente.", "bot");
+  } catch {
+    quitarEscribiendo();
+    agregarMensaje("Ha ocurrido un error. Inténtelo más tarde.", "bot");
   }
 }
 
-// Enviar mensaje con Enter
-document.getElementById("texto").addEventListener("keypress", function(e) {
-  if (e.key === "Enter") {
-    e.preventDefault();
-    enviar();
-  }
+input.addEventListener("keydown", e => {
+  if (e.key === "Enter") enviar();
 });
 </script>
+
 
 </body>
 </html>
