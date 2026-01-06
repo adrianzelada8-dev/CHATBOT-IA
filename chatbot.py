@@ -2,8 +2,6 @@ import os
 import json
 import requests
 from openai import OpenAI
-from langchain.vectorstores import FAISS
-from langchain.embeddings.openai import OpenAIEmbeddings
 
 # ===============================
 # CONFIG
@@ -22,12 +20,6 @@ WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwn4ijef_IF4FdZxJG8r0I6it
 # ===============================
 with open("info_negocio.txt", "r", encoding="utf-8") as f:
     info_negocio = f.read()
-
-# ===============================
-# CARGAR VECTORSTORE PARA RAG
-# ===============================
-embeddings = OpenAIEmbeddings()
-vectorstore = FAISS.load_local("vectorstore_path", embeddings)  # Ajusta la ruta
 
 # ===============================
 # MEMORIA DE CONVERSACIÓN
@@ -80,8 +72,7 @@ def enviar_a_google_sheet(nombre: str, telefono: str):
         print("Error enviando a Google Sheet:", e)
 
 
-def generar_respuesta_conversacional(mensaje_usuario: str, contexto: str = ""):
-    prompt_info = f"{info_negocio}\n{contexto}" if contexto else info_negocio
+def generar_respuesta_conversacional(mensaje_usuario: str):
     response = client.chat.completions.create(
         model="gpt-4.1-mini",
         messages=[
@@ -92,21 +83,13 @@ def generar_respuesta_conversacional(mensaje_usuario: str, contexto: str = ""):
                     "Responde de forma natural y cercana.\n"
                     "Usa la información del negocio si es relevante.\n"
                     "Si no tienes un dato exacto, responde de forma educada y ofrece ayuda.\n"
-                    f"Información clínica:\n{prompt_info}"
+                    f"Información clínica:\n{info_negocio}"
                 )
             },
             {"role": "user", "content": mensaje_usuario}
         ]
     )
     return response.choices[0].message.content
-
-
-def buscar_en_documentos(pregunta: str):
-    # Busca en vectorstore (RAG)
-    docs = vectorstore.similarity_search(pregunta, k=3)
-    contexto = "\n".join([doc.page_content for doc in docs])
-    return generar_respuesta_conversacional(pregunta, contexto)
-
 
 # ===============================
 # FUNCIÓN PRINCIPAL
@@ -140,7 +123,7 @@ def responder(mensaje: str, usuario_id: str = "default"):
             "mensaje": "Perfecto 😊 ¿Me indicas tu nombre y teléfono para contactarte?"
         }
 
-    # 5️⃣ Respuesta normal conversacional (RAG + fallback)
-    respuesta = buscar_en_documentos(mensaje)
+    # 5️⃣ Respuesta normal conversacional
+    respuesta = generar_respuesta_conversacional(mensaje)
 
     return {"tipo": "respuesta", "mensaje": respuesta}
