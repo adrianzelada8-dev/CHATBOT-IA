@@ -2,8 +2,20 @@ import os
 import json
 import requests
 from openai import OpenAI
+from langchain.vectorstores import FAISS
+from langchain.embeddings.openai import OpenAIEmbeddings
 
+# ===============================
+# CONFIG
+# ===============================
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+
+PALABRAS_CONTACTO = [
+    "cita", "reservar", "contactar", "llamar",
+    "información", "telefono", "teléfono", "email"
+]
+
+WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwn4ijef_IF4FdZxJG8r0I6itKufNU-YztCgbu5GBjV9LgQ3GNfjQuZqytWLULIVxQ/exec"
 
 # ===============================
 # CARGAR INFO DEL NEGOCIO
@@ -12,15 +24,15 @@ with open("info_negocio.txt", "r", encoding="utf-8") as f:
     info_negocio = f.read()
 
 # ===============================
-# CONFIG
+# CARGAR VECTORSTORE PARA RAG
 # ===============================
-PALABRAS_CONTACTO = [
-    "cita", "reservar", "contactar", "llamar",
-    "información", "telefono", "teléfono", "email"
-]
+embeddings = OpenAIEmbeddings()
+vectorstore = FAISS.load_local("vectorstore_path", embeddings)  # Ajusta la ruta
 
-WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwn4ijef_IF4FdZxJG8r0I6itKufNU-YztCgbu5GBjV9LgQ3GNfjQuZqytWLULIVxQ/exec"
-
+# ===============================
+# MEMORIA DE CONVERSACIÓN
+# ===============================
+estado_usuarios = {}  # Diccionario por usuario_id
 
 # ===============================
 # UTILIDADES
@@ -31,10 +43,6 @@ def quiere_contacto(mensaje: str) -> bool:
 
 
 def extraer_datos_contacto(mensaje: str):
-    """
-    Usa ChatGPT para extraer nombre y teléfono de forma robusta.
-    Devuelve (nombre, telefono) o (None, None)
-    """
     try:
         response = client.chat.completions.create(
             model="gpt-4.1-mini",
@@ -45,7 +53,7 @@ def extraer_datos_contacto(mensaje: str):
                         "Extrae nombre y teléfono del mensaje del usuario.\n"
                         "Responde SOLO en JSON válido, sin texto adicional.\n"
                         "Formato:\n"
-                        "{ \"nombre\": string | null, \"telefono\": string | null }\n\n"
+                        "{ \"nombre\": string | null, \"telefono\": string | null }\n"
                         "Normaliza el teléfono quitando espacios y símbolos."
                     )
                 },
@@ -55,7 +63,6 @@ def extraer_datos_contacto(mensaje: str):
 
         contenido = response.choices[0].message.content.strip()
         datos = json.loads(contenido)
-
         return datos.get("nombre"), datos.get("telefono")
 
     except Exception as e:
@@ -73,14 +80,8 @@ def enviar_a_google_sheet(nombre: str, telefono: str):
         print("Error enviando a Google Sheet:", e)
 
 
-# ===============================
-# RESPUESTA CONVERSACIONAL
-# ===============================
-def generar_respuesta_conversacional(mensaje_usuario: str):
-    """
-    ChatGPT responde de forma natural usando la info del negocio.
-    No suena robótico ni dice 'no lo sé' de forma seca.
-    """
+def generar_respuesta_conversacional(mensaje_usuario: str, contexto: str = ""):
+    prompt_info = f"{info_negocio}\n{contexto}" if contexto else info_negocio
     response = client.chat.completions.create(
         model="gpt-4.1-mini",
         messages=[
@@ -88,55 +89,58 @@ def generar_respuesta_conversacional(mensaje_usuario: str):
                 "role": "system",
                 "content": (
                     "Eres una recepcionista profesional y amable de una clínica dental.\n"
-                    "Responde de forma natural, cercana y humana.\n\n"
-                    "Usa la información del negocio SOLO si es relevante.\n"
-                    "Si no tienes un dato exacto, responde con educación y ofrece ayudar "
-                    "a pedir cita o resolver dudas generales.\n\n"
-                    "Información de la clínica:\n"
-                    f"{info_negocio}"
+                    "Responde de forma natural y cercana.\n"
+                    "Usa la información del negocio si es relevante.\n"
+                    "Si no tienes un dato exacto, responde de forma educada y ofrece ayuda.\n"
+                    f"Información clínica:\n{prompt_info}"
                 )
             },
             {"role": "user", "content": mensaje_usuario}
         ]
     )
-
     return response.choices[0].message.content
+
+
+def buscar_en_documentos(pregunta: str):
+    # Busca en vectorstore (RAG)
+    docs = vectorstore.similarity_search(pregunta, k=3)
+    contexto = "\n".join([doc.page_content for doc in docs])
+    return generar_respuesta_conversacional(pregunta, contexto)
 
 
 # ===============================
 # FUNCIÓN PRINCIPAL
 # ===============================
-def responder(mensaje: str):
+def responder(mensaje: str, usuario_id: str = "default"):
     mensaje = mensaje.strip()
+    if usuario_id not in estado_usuarios:
+        estado_usuarios[usuario_id] = {"contacto_preguntado": False}
 
+    # 1️⃣ Mensaje vacío
     if not mensaje:
-        return {
-            "tipo": "respuesta",
-            "mensaje": "Hola 😊 ¿En qué puedo ayudarte?"
-        }
+        return {"tipo": "respuesta", "mensaje": "Hola 😊 ¿En qué puedo ayudarte?"}
 
-    # 1️⃣ Extraer contacto con IA
+    # 2️⃣ Extraer datos de contacto
     nombre, telefono = extraer_datos_contacto(mensaje)
 
-    # 2️⃣ Si hay lead completo → guardar
+    # 3️⃣ Lead completo → guardar
     if nombre and telefono:
         enviar_a_google_sheet(nombre, telefono)
+        estado_usuarios[usuario_id]["contacto_preguntado"] = True
         return {
             "tipo": "lead",
             "mensaje": f"Gracias {nombre}, hemos recibido tus datos y te contactaremos muy pronto."
         }
 
-    # 3️⃣ Si quiere contacto pero faltan datos
-    if quiere_contacto(mensaje):
+    # 4️⃣ Quiere contacto pero aún faltan datos
+    if quiere_contacto(mensaje) and not estado_usuarios[usuario_id]["contacto_preguntado"]:
+        estado_usuarios[usuario_id]["contacto_preguntado"] = True
         return {
             "tipo": "lead",
             "mensaje": "Perfecto 😊 ¿Me indicas tu nombre y teléfono para contactarte?"
         }
 
-    # 4️⃣ Respuesta normal conversacional
-    respuesta = generar_respuesta_conversacional(mensaje)
+    # 5️⃣ Respuesta normal conversacional (RAG + fallback)
+    respuesta = buscar_en_documentos(mensaje)
 
-    return {
-        "tipo": "respuesta",
-        "mensaje": respuesta
-    }
+    return {"tipo": "respuesta", "mensaje": respuesta}
