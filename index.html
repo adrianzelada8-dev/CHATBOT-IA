@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Chatbot</title>
   <style>
 body {
@@ -27,8 +28,7 @@ body {
 }
 
 /* Header */
-#chat::before {
-  content: "Asistente Clínica Dental";
+#header {
   background: #0b5ed7;
   color: white;
   padding: 14px;
@@ -106,6 +106,13 @@ button {
 button:hover {
   background: #084298;
 }
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.msg { white-space: pre-wrap; word-wrap: break-word; }
 </style>
 
 
@@ -113,10 +120,11 @@ button:hover {
 <body>
 
 <div id="chat">
-  <div id="messages"></div>
+  <div id="header">Asistente Clínica Dental</div>
+  <div id="messages" aria-live="polite"></div>
   <div id="input">
-    <input id="texto" placeholder="Escribe tu mensaje..." />
-    <button onclick="enviar()">Enviar</button>
+    <input id="texto" placeholder="Escribe tu mensaje..." maxlength="1000" autocomplete="off" aria-label="Mensaje" />
+    <button id="enviarBtn" onclick="enviar()">Enviar</button>
   </div>
 </div>
 
@@ -125,6 +133,19 @@ const API_URL = "https://web-production-e2e34.up.railway.app/chat";
 
 const messages = document.getElementById("messages");
 const input = document.getElementById("texto");
+const boton = document.getElementById("enviarBtn");
+
+// Identificador de sesión para que el bot recuerde la conversación
+let sessionId;
+try {
+  sessionId = localStorage.getItem("chat_session");
+  if (!sessionId) {
+    sessionId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2));
+    localStorage.setItem("chat_session", sessionId);
+  }
+} catch {
+  sessionId = String(Date.now()) + Math.random().toString(36).slice(2);
+}
 
 function agregarMensaje(texto, clase) {
   const div = document.createElement("div");
@@ -148,10 +169,14 @@ function quitarEscribiendo() {
   if (typing) typing.remove();
 }
 
+let enviando = false;
+
 async function enviar() {
   const texto = input.value.trim();
-  if (!texto) return;
+  if (!texto || enviando) return;
 
+  enviando = true;
+  boton.disabled = true;
   agregarMensaje(texto, "user");
   input.value = "";
 
@@ -161,20 +186,27 @@ async function enviar() {
     const res = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ texto })
+      body: JSON.stringify({ texto, session_id: sessionId })
     });
 
+    if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     quitarEscribiendo();
     agregarMensaje(data.mensaje, "bot");
   } catch {
     quitarEscribiendo();
     agregarMensaje("Ha ocurrido un error. Inténtelo más tarde.", "bot");
+  } finally {
+    enviando = false;
+    boton.disabled = false;
+    input.focus();
   }
 }
 
+agregarMensaje("Hola 😊 Soy el asistente de la Clínica Dental Sonrisa. ¿En qué puedo ayudarte?", "bot");
+
 input.addEventListener("keydown", e => {
-  if (e.key === "Enter") enviar();
+  if (e.key === "Enter" && !e.isComposing) enviar();
 });
 </script>
 
